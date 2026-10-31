@@ -49,6 +49,9 @@ add_executable(Pons WIN32
     src/app/Pons.rc
 )
 target_link_libraries(Pons PRIVATE ponscore gdi32 comctl32 dwmapi uxtheme)
+# Rebuild the resources when the icon or manifest changes.
+set_source_files_properties(src/app/Pons.rc PROPERTIES OBJECT_DEPENDS
+    "${CMAKE_SOURCE_DIR}/assets/pons.ico;${CMAKE_SOURCE_DIR}/src/app/Pons.manifest")
 # The manifest is embedded through Pons.rc.
 target_link_options(Pons PRIVATE /MANIFEST:NO)
 

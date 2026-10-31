@@ -142,6 +142,9 @@ bool MainWindow::Create(HINSTANCE instance, int show, const std::vector<std::fil
     windowClass.lpfnWndProc = WindowProc;
     windowClass.hInstance = instance;
     windowClass.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_PONS));
+    // The title bar uses the 16 px image, not a shrunken 32 px one.
+    windowClass.hIconSm = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_PONS), IMAGE_ICON,
+                                                        GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0));
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     windowClass.lpszClassName = kMainWindowClass;
     if (!RegisterClassExW(&windowClass)) return false;
