@@ -1,0 +1,9 @@
+{
+  "appId": "{D1AD7145-15DD-4945-A370-4209F4D8A656}",
+  "name": "Pons WiFi Transfer",
+  "category": "Utilities",
+  "icon": "assets/pons.png",
+  "screenshots": [],
+  "installer": "PonsSetup.exe",
+  "exe": "Pons.exe"
+}
