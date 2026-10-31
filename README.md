@@ -32,6 +32,8 @@ Open Pons, scan the QR code with your phone's camera and a simple page opens in 
 
 Download `PonsSetup.exe` from [Releases](https://github.com/VitomDev/Pons-WiFi-Transfer/releases/latest) and run it.
 
+> 🧰 **Recommended:** install it with [Vitool Box](https://github.com/VitomDev/Vitool-Box), which keeps all VitomDev apps in one place and installs or removes them with a switch.
+
 - Per-user install, no admin rights needed
 - 🛡️ The first time Pons starts, **Windows Firewall** asks whether it may use the network: allow it on **Private networks** (home Wi-Fi). Public networks aren't needed
 
@@ -120,4 +122,4 @@ Feel free to reach out or follow me:
 - 🐙 GitHub: [@VitomDev](https://github.com/VitomDev)
 - 🐦 Twitter/X: [@VitomDev](https://twitter.com/VitomDev)
 - 🎮 Twitch: [@VitomDev](https://www.twitch.tv/VitomDev)
-- 💼 LinkedIn: [Víctor Escós](https://www.linkedin.com/in/víctor-escós-batalla/)
+- 💼 LinkedIn: [VitomDev](https://www.linkedin.com/in/víctor-escós-batalla/)
