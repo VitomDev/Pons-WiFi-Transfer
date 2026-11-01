@@ -3,7 +3,9 @@
   "name": "Pons WiFi Transfer",
   "category": "Utilities",
   "icon": "assets/pons.png",
-  "screenshots": [],
+  "screenshots": [
+    "assets/screenshots/screenshot-1.png"
+  ],
   "installer": "PonsSetup.exe",
   "exe": "Pons.exe",
   "settings": [
