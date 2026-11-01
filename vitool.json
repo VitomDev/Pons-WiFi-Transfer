@@ -5,5 +5,8 @@
   "icon": "assets/pons.png",
   "screenshots": [],
   "installer": "PonsSetup.exe",
-  "exe": "Pons.exe"
+  "exe": "Pons.exe",
+  "settings": [
+    "HKCU\\Software\\Pons WiFi Transfer"
+  ]
 }
