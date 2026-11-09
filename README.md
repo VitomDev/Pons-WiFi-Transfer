@@ -8,6 +8,8 @@ Open Pons, scan the QR code with your phone's camera and a simple page opens in 
 
 **Nothing to install on the phone**, no accounts, no cloud: everything stays on your local network.
 
+<p align="center"><img src="assets/screenshots/screenshot-1.png" width="620" alt="Pons on the PC">&nbsp;&nbsp;<img src="assets/screenshots/screenshot-2.png" width="230" alt="Pons on the phone"></p>
+
 ---
 
 ## 🚀 Features
