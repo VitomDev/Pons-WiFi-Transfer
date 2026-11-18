@@ -5,7 +5,8 @@
   "icon": "assets/pons.png",
   "screenshots": [
     "assets/screenshots/screenshot-1.png",
-    "assets/screenshots/screenshot-2.png"
+    "assets/screenshots/screenshot-2.png",
+    "assets/screenshots/screenshot-3.png"
   ],
   "installer": "PonsSetup.exe",
   "exe": "Pons.exe",

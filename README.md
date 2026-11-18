@@ -9,6 +9,7 @@ Open Pons, scan the QR code with a phone camera (or open the link on another com
 **Nothing to install on the other device**, no accounts, no cloud: everything stays on your local network.
 
 <p align="center"><img src="assets/screenshots/screenshot-1.png" width="620" alt="Pons on the PC">&nbsp;&nbsp;<img src="assets/screenshots/screenshot-2.png" width="230" alt="Pons in a phone browser"></p>
+<p align="center"><img src="assets/screenshots/screenshot-3.png" width="620" alt="Pons in a browser on another PC"></p>
 
 ---
 
