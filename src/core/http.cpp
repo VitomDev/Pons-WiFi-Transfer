@@ -154,7 +154,7 @@ std::string JsonEscape(std::string_view text) {
 }
 
 std::wstring SanitizeFileName(std::wstring_view name) {
-    // Phones may send a path; only the last part is the name.
+    // Browsers may send a path; only the last part is the name.
     const size_t slash = name.find_last_of(L"/\\");
     if (slash != std::wstring_view::npos) name.remove_prefix(slash + 1);
 

@@ -32,7 +32,7 @@ std::optional<std::string> QueryParam(std::string_view query, std::string_view n
 
 std::string JsonEscape(std::string_view text);
 
-// A safe file name for anything the phone sends: no folders, reserved
+// A safe file name for anything a device sends: no folders, reserved
 // characters or device names, never empty.
 std::wstring SanitizeFileName(std::wstring_view name);
 

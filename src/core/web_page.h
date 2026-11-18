@@ -4,7 +4,7 @@
 
 namespace pons {
 
-// The page the phone opens from the QR code: one self-contained HTML file
+// The page devices open from the QR code or link: one self-contained HTML file
 // (styles and script inline), nothing loaded from the internet.
 const std::string& PageHtml();
 

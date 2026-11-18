@@ -1,11 +1,11 @@
 ; Pons WiFi Transfer installer (Inno Setup 6).
 ;
 ; Per-user install without administrator rights. Uninstalling removes the
-; settings too; files received from phones stay where they were saved.
+; settings too; received files stay where they were saved.
 ;
 ; Built by build.ps1, which passes /DBuildDir=<folder with Pons.exe>.
 
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.1"
 #define AppName "Pons WiFi Transfer"
 
 #ifndef BuildDir
@@ -23,7 +23,7 @@ AppSupportURL=https://github.com/VitomDev/Pons-WiFi-Transfer/issues
 AppCopyright=Copyright (c) 2026 VitomDev
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany=VitomDev
-VersionInfoDescription={#AppName} - Share files between your PC and phone Setup
+VersionInfoDescription={#AppName} - Share files between your PC and other devices Setup
 DefaultDirName={localappdata}\Programs\{#AppName}
 DisableDirPage=yes
 DisableProgramGroupPage=yes

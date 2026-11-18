@@ -291,7 +291,7 @@ TEST(ServerReceivesUploads) {
     const auto transfers = test.server.Transfers();
     CHECK(transfers.size() == 2);
     CHECK(transfers[0].state == TransferState::Done && transfers[0].done == content.size());
-    CHECK(transfers[0].direction == Direction::FromPhone);
+    CHECK(transfers[0].direction == Direction::FromDevice);
     saved.close();
     fs::remove_all(test.folder);
 }

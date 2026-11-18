@@ -265,7 +265,7 @@ void Server::AcceptLoop() {
             }
             connections_.insert(connection);
         }
-        // A stalled phone cannot hold a connection forever.
+        // A stalled device cannot hold a connection forever.
         const DWORD timeout = kSocketTimeoutMs;
         setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
         setsockopt(connection, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
@@ -345,7 +345,7 @@ bool Server::Handle(SOCKET socket, const RequestHead& request, Body& body) {
             text_ = FromUtf8(text);
             ++textRevision_;
         }
-        Notify(ServerEvent::TextFromPhone);
+        Notify(ServerEvent::TextFromDevice);
         return SendJson(socket, 200, StateJson(), request.keepAlive);
     }
     if (request.path == "/" || request.path.starts_with("/api/") || request.path.starts_with("/f/")) {
@@ -376,7 +376,7 @@ bool Server::HandleUpload(SOCKET socket, const RequestHead& request, Body& body)
     HANDLE file = CreateFileW(partial.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return SendError(socket, 500, "The file could not be saved on the PC.");
 
-    const uint32_t id = BeginTransfer(Direction::FromPhone, name, request.contentLength);
+    const uint32_t id = BeginTransfer(Direction::FromDevice, name, request.contentLength);
     std::vector<char> chunk(kChunkBytes);
     uint64_t written = 0;
     bool ok = true;
@@ -422,7 +422,7 @@ bool Server::HandleDownload(SOCKET socket, const RequestHead& request, uint32_t 
 
     const std::string head = ResponseHead(200, "application/octet-stream", total, request.keepAlive,
                                           "Content-Disposition: " + AttachmentHeader(shared.name) + "\r\n");
-    const uint32_t transfer = BeginTransfer(Direction::ToPhone, shared.name, total);
+    const uint32_t transfer = BeginTransfer(Direction::ToDevice, shared.name, total);
     bool ok = SendAll(socket, head.data(), head.size());
     std::vector<char> chunk(kChunkBytes);
     uint64_t sent = 0;

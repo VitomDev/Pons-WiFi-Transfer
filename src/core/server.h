@@ -24,12 +24,12 @@ struct SharedFile {
     uint64_t size = 0;
 };
 
-enum class Direction { ToPhone, FromPhone };
+enum class Direction { ToDevice, FromDevice };
 enum class TransferState { Active, Done, Failed };
 
 struct Transfer {
     uint32_t id = 0;
-    Direction direction = Direction::FromPhone;
+    Direction direction = Direction::FromDevice;
     std::wstring name;
     std::filesystem::path path;  // where an upload was saved, once done
     uint64_t done = 0;
@@ -38,7 +38,7 @@ struct Transfer {
 };
 
 // Posted to the notify window as wParam of its message, from server threads.
-enum class ServerEvent : WPARAM { TransfersChanged = 1, TextFromPhone = 2 };
+enum class ServerEvent : WPARAM { TransfersChanged = 1, TextFromDevice = 2 };
 
 struct ServerOptions {
     uint32_t address = 0;  // host byte order; the server listens on this address only
@@ -47,7 +47,7 @@ struct ServerOptions {
     bool allowLoopback = false;  // tests talk to 127.0.0.1
 };
 
-// The small HTTP server the phone talks to. Every request must carry the
+// The small HTTP server other devices talk to. Every request must carry the
 // session token, which changes on each Start; only peers on a private
 // network are accepted. Windows sockets only, no HTTP library.
 class Server {
@@ -74,7 +74,7 @@ public:
 
     void SetReceiveFolder(const std::filesystem::path& folder);
 
-    // Files offered to the phone; they stay on disk where they are.
+    // Files offered to other devices; they stay on disk where they are.
     std::vector<uint32_t> AddFiles(const std::vector<std::filesystem::path>& paths);
     void RemoveFile(uint32_t id);
     std::vector<SharedFile> Files() const;
@@ -86,7 +86,7 @@ public:
     void ClearFinishedTransfers();
     bool HasActiveTransfers() const;
 
-    // GetTickCount64 of the last request or transferred chunk from the phone.
+    // GetTickCount64 of the last request or transferred chunk from a device.
     ULONGLONG LastActivity() const { return lastActivity_; }
 
 private:

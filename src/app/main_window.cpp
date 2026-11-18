@@ -24,7 +24,7 @@ constexpr UINT WM_APP_SERVER = WM_APP + 1;
 constexpr UINT_PTR kTickTimer = 1;
 constexpr ULONGLONG kNetworkCheckMs = 10'000;
 // The page asks every two seconds; a little longer than that means gone.
-constexpr ULONGLONG kPhoneSeenMs = 6'000;
+constexpr ULONGLONG kDeviceSeenMs = 6'000;
 constexpr int kTimeoutChoices[] = {5, 15, 30, 60, 0};
 
 enum ControlId {
@@ -59,7 +59,7 @@ constexpr ButtonInfo kButtons[] = {
     {kChangeFolder, nullptr, L"Change…", ButtonStyle::Standard},
     {kOpenFolder, icons::kFolder, L"Open", ButtonStyle::Standard},
     {kClearTransfers, icons::kClear, L"Clear", ButtonStyle::Subtle},
-    {kSendText, icons::kSend, L"Send to phone", ButtonStyle::Primary},
+    {kSendText, icons::kSend, L"Send to devices", ButtonStyle::Primary},
     {kCopyText, icons::kCopy, L"Copy", ButtonStyle::Standard},
 };
 
@@ -103,7 +103,7 @@ std::vector<std::filesystem::path> PickFiles(HWND owner, bool folders) {
     FILEOPENDIALOGOPTIONS options = 0;
     dialog->GetOptions(&options);
     dialog->SetOptions(options | FOS_FORCEFILESYSTEM | (folders ? FOS_PICKFOLDERS : FOS_ALLOWMULTISELECT));
-    dialog->SetTitle(folders ? L"Where should files from the phone go?" : L"Share files with your phone");
+    dialog->SetTitle(folders ? L"Where should received files go?" : L"Share files with your devices");
     IShellItemArray* items = nullptr;
     if (SUCCEEDED(dialog->Show(owner)) && SUCCEEDED(dialog->GetResults(&items))) {
         DWORD count = 0;
@@ -266,7 +266,7 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
             if (header->idFrom == kFileList && header->code == LVN_GETEMPTYMARKUP) {
                 auto* markup = reinterpret_cast<NMLVEMPTYMARKUP*>(lParam);
                 markup->dwFlags = EMF_CENTERED;
-                wcscpy_s(markup->szMarkup, L"Drag files here to share them with your phone");
+                wcscpy_s(markup->szMarkup, L"Drag files here to share them with your devices");
                 return TRUE;
             }
             if (header->idFrom == kFileList && header->code == LVN_KEYDOWN &&
@@ -308,7 +308,7 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
             return TRUE;
         }
         case WM_APP_SERVER:
-            if (static_cast<ServerEvent>(wParam) == ServerEvent::TextFromPhone) {
+            if (static_cast<ServerEvent>(wParam) == ServerEvent::TextFromDevice) {
                 SetWindowTextW(text_, ToWindowsLineBreaks(server_.Text()).c_str());
                 FLASHWINFO flash{sizeof(flash), window_, FLASHW_TRAY | FLASHW_TIMERNOFG, 3, 0};
                 if (GetForegroundWindow() != window_) FlashWindowEx(&flash);
@@ -366,7 +366,7 @@ void MainWindow::CreateControls() {
     text_ = CreateWindowExW(0, WC_EDITW, nullptr,
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN,
                             0, 0, 0, 0, window_, reinterpret_cast<HMENU>(kTextBox), instance_, nullptr);
-    SendMessageW(text_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Text or a link to send to your phone"));
+    SendMessageW(text_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Text or a link to send to your devices"));
 
     port_ = CreateWindowExW(0, WC_EDITW, std::to_wstring(settings_.port).c_str(),
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_CENTER, 0, 0, 0, 0, window_,
@@ -491,7 +491,7 @@ void MainWindow::Paint(HDC dc) {
     DrawTextIn(dc, smallFont_, theme_.secondaryText, L"WiFi Transfer · same network, nothing to install",
                {margin, margin + Scale(24), qrRect_.right, margin + Scale(44)}, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-    // The QR code on a white card, so phones read it in dark mode too.
+    // The QR code on a white card, so phone cameras read it in dark mode too.
     const bool showQr = state_ == ServerState::Running && !qr_.empty();
     FillRounded(dc, qrRect_, showQr ? RGB(255, 255, 255) : theme_.hover, Scale(8));
     if (showQr) {
@@ -514,7 +514,7 @@ void MainWindow::Paint(HDC dc) {
         InflateRect(&inner, -Scale(24), 0);
         const wchar_t* message = state_ == ServerState::Idle ? L"Stopped to keep your PC safe.\nPress Start for a new code."
                                  : state_ == ServerState::PortBusy ? L"The port is in use.\nChoose another port below."
-                                                                   : L"Connect this PC to the same\nWi-Fi as your phone.";
+                                                                   : L"Connect this PC to the same\nnetwork as your other devices.";
         RECT measure = inner;
         DrawTextIn(dc, textFont_, theme_.secondaryText, message, measure, DT_CENTER | DT_WORDBREAK | DT_CALCRECT);
         const int height = measure.bottom - measure.top;
@@ -524,9 +524,9 @@ void MainWindow::Paint(HDC dc) {
     }
 
     // Status: a colored dot, a short line and the details.
-    const bool phoneSeen = state_ == ServerState::Running && server_.LastActivity() > startedAt_ &&
-                           GetTickCount64() - server_.LastActivity() < kPhoneSeenMs;
-    const COLORREF dotColor = state_ != ServerState::Running ? RGB(200, 70, 60) : phoneSeen ? RGB(40, 170, 90) : theme_.accent;
+    const bool deviceSeen = state_ == ServerState::Running && server_.LastActivity() > startedAt_ &&
+                           GetTickCount64() - server_.LastActivity() < kDeviceSeenMs;
+    const COLORREF dotColor = state_ != ServerState::Running ? RGB(200, 70, 60) : deviceSeen ? RGB(40, 170, 90) : theme_.accent;
     const int dot = Scale(8);
     const int lineHeight = Scale(22);
     RECT dotRect{statusRect_.left, statusRect_.top + (lineHeight - dot) / 2, statusRect_.left + dot,
@@ -542,10 +542,10 @@ void MainWindow::Paint(HDC dc) {
     DrawTextIn(dc, textFont_, theme_.text, L"Port", portLabel_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     DrawTextIn(dc, textFont_, theme_.text, L"Stop when idle for", timeoutLabel_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-    DrawTextIn(dc, headingFont_, theme_.text, L"Shared with your phone", filesHeading_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextIn(dc, headingFont_, theme_.text, L"Shared with your devices", filesHeading_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     RECT folderCaption = folderLabel_;
     folderCaption.bottom = folderCaption.top + (folderLabel_.bottom - folderLabel_.top) / 2;
-    DrawTextIn(dc, smallFont_, theme_.secondaryText, L"Files from your phone go to", folderCaption,
+    DrawTextIn(dc, smallFont_, theme_.secondaryText, L"Files from your devices go to", folderCaption,
                DT_LEFT | DT_SINGLELINE | DT_BOTTOM);
     RECT folderPath = folderLabel_;
     folderPath.top = folderCaption.bottom;
@@ -669,9 +669,9 @@ void MainWindow::UpdateStatus() {
     std::wstring detail;
     switch (state_) {
         case ServerState::Running: {
-            const bool phoneSeen =
-                server_.LastActivity() > startedAt_ && GetTickCount64() - server_.LastActivity() < kPhoneSeenMs;
-            status = phoneSeen ? L"Phone connected" : L"Scan the code with your phone";
+            const bool deviceSeen =
+                server_.LastActivity() > startedAt_ && GetTickCount64() - server_.LastActivity() < kDeviceSeenMs;
+            status = deviceSeen ? L"Device connected" : L"Scan the code or open the link";
             detail = L"http://" + FormatIPv4(address_) + L":" + std::to_wstring(server_.Port());
             break;
         }
@@ -849,9 +849,9 @@ void MainWindow::PaintTransfers(HWND window, HDC dc) {
         RECT row{0, y, client.right, y + rowHeight};
         FillRounded(dc, {row.left, row.top, row.right, row.bottom - Scale(4)}, theme_.pressed, Scale(6));
 
-        const bool fromPhone = transfer.direction == Direction::FromPhone;
-        // Arrow down: into the PC; arrow up: out to the phone.
-        DrawTextIn(dc, iconFont_, fromPhone ? RGB(40, 170, 90) : theme_.accent, fromPhone ? L"" : L"",
+        const bool fromDevice = transfer.direction == Direction::FromDevice;
+        // Arrow down: into the PC; arrow up: out to the device.
+        DrawTextIn(dc, iconFont_, fromDevice ? RGB(40, 170, 90) : theme_.accent, fromDevice ? L"" : L"",
                    {Scale(10), y, Scale(30), y + rowHeight - Scale(4)}, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         const int percent = transfer.total ? static_cast<int>(transfer.done * 100 / transfer.total) : 100;
@@ -862,7 +862,7 @@ void MainWindow::PaintTransfers(HWND window, HDC dc) {
                 meta = std::to_wstring(percent) + L"% · " + FormatSize(transfer.done) + L" of " + FormatSize(transfer.total);
                 break;
             case TransferState::Done:
-                meta = (fromPhone ? L"Saved · " : L"Sent · ") + FormatSize(transfer.total);
+                meta = (fromDevice ? L"Saved · " : L"Sent · ") + FormatSize(transfer.total);
                 break;
             case TransferState::Failed:
                 meta = L"Interrupted";
@@ -883,7 +883,7 @@ void MainWindow::PaintTransfers(HWND window, HDC dc) {
         if (transfer.state != TransferState::Failed && percent > 0) {
             RECT fill = track;
             fill.right = fill.left + (track.right - track.left) * percent / 100;
-            FillRounded(dc, fill, fromPhone ? RGB(40, 170, 90) : theme_.accent, Scale(2));
+            FillRounded(dc, fill, fromDevice ? RGB(40, 170, 90) : theme_.accent, Scale(2));
         }
         y += rowHeight;
     }

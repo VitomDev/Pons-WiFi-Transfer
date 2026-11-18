@@ -3,29 +3,29 @@
 # 🌉 Pons — WiFi Transfer
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Move files between your PC and your phone over Wi-Fi. 📲💻  
-Open Pons, scan the QR code with your phone's camera and a simple page opens in its browser: download what you dragged into Pons, or send photos and files straight to a folder on your PC.
+Move files between your PC and any device on the same network over Wi-Fi: a phone, a tablet or another computer. 📲💻  
+Open Pons, scan the QR code with a phone camera (or open the link on another computer) and a simple page opens in its browser: download what you dragged into Pons, or send photos and files straight to a folder on your PC.
 
-**Nothing to install on the phone**, no accounts, no cloud: everything stays on your local network.
+**Nothing to install on the other device**, no accounts, no cloud: everything stays on your local network.
 
-<p align="center"><img src="assets/screenshots/screenshot-1.png" width="620" alt="Pons on the PC">&nbsp;&nbsp;<img src="assets/screenshots/screenshot-2.png" width="230" alt="Pons on the phone"></p>
+<p align="center"><img src="assets/screenshots/screenshot-1.png" width="620" alt="Pons on the PC">&nbsp;&nbsp;<img src="assets/screenshots/screenshot-2.png" width="230" alt="Pons in a phone browser"></p>
 
 ---
 
 ## 🚀 Features
 
-- 📷 **Scan and go**: a QR code with the PC's address; any phone camera opens it (iPhone and Android)
-- ⬇️ **PC → phone**: drag files (or a folder) into Pons and download them on the phone
-- ⬆️ **Phone → PC**: pick several photos or files at once, with a progress bar for each, saved to **Downloads** or any folder you choose
+- 📷 **Scan and go**: a QR code with the PC's address; any phone camera opens it (iPhone and Android), or copy the link to a laptop or another PC
+- ⬇️ **PC → device**: drag files (or a folder) into Pons and download them on the other device
+- ⬆️ **Device → PC**: pick several photos or files at once, with a progress bar for each, saved to **Downloads** or any folder you choose
 - 📝 **Shared text**: send a link or some text either way, and copy it on the other side
 - 📊 **Transfers list** on the PC with live progress; click a received file to show it in its folder
 - 🔒 **Private by design**
   - Every request needs a random per-session key, included in the QR code. **New link** changes it at once
   - Only devices on your private network (home Wi-Fi) can connect
   - The server stops after **15 minutes** without use (5, 15, 30, 60 minutes or never) and when you close Pons
-  - Half-received files never look complete, and names sent by the phone can't escape the chosen folder
+  - Half-received files never look complete, and names sent by other devices can't escape the chosen folder
 - 🌐 Changed Wi-Fi? Pons notices and shows a new code
-- 🌙 Clean Windows 11 look that follows your light or dark theme; the phone page follows the phone's theme too
+- 🌙 Clean Windows 11 look that follows your light or dark theme; the browser page follows the device's theme too
 - 🪶 Tiny: a ~0.7 MB program, a ~2.3 MB installer, no .NET or Visual C++ runtime needed
 
 ---
@@ -47,17 +47,17 @@ Uninstalling (Settings → Apps) removes Pons and its settings. Files you receiv
 
 | Action | How |
 | --- | --- |
-| Connect the phone | Scan the QR code with the camera (same Wi-Fi as the PC) |
-| Share files with the phone | Drag them into Pons, or **Add files** |
+| Connect a device | Scan the QR code with a phone camera, or **Copy link** and open it on another computer (same network as the PC) |
+| Share files with your devices | Drag them into Pons, or **Add files** |
 | Stop sharing a file | Select it → **Remove** (or `Delete`) |
-| Send files to the PC | On the phone: **Choose photos or files** |
+| Send files to the PC | On the other device: **Choose photos or files** |
 | Where files arrive | **Change…** picks the folder, **Open** shows it |
-| Send text or a link | Type it and **Send to phone** / **Send to PC** |
+| Send text or a link | Type it and **Send to devices** / **Send to PC** |
 | Invalidate the old QR code | **New link** |
 | Copy the link (e.g. for a laptop) | **Copy link** |
 | Port and idle timeout | Bottom left of the window |
 
-💡 Phone and PC must be on the same network. Guest Wi-Fi networks often isolate devices from each other; use the main network if the phone can't connect.
+💡 The PC and the other device must be on the same network. Guest Wi-Fi networks often isolate devices from each other; use the main network if a device can't connect.
 
 ---
 
@@ -99,7 +99,7 @@ See [third-party notices](THIRD-PARTY-NOTICES.md) for licenses.
 
 ## 🪟 Compatibility
 
-Windows 10 (version 1809 or newer) and Windows 11, 64-bit. Any phone with a modern browser.
+Windows 10 (version 1809 or newer) and Windows 11, 64-bit. Any phone, tablet or computer with a modern browser.
 
 ---
 

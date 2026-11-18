@@ -90,7 +90,7 @@ R"PONS(<body>
 
 <section id="ended">
   <h2>Session ended</h2>
-  <p class="empty">Pons was closed or its link changed. Scan the QR code on your PC again.</p>
+  <p class="empty">Pons was closed or its link changed. Scan the QR code or open the new link from Pons on your PC.</p>
 </section>
 
 <section class="live">
@@ -316,7 +316,7 @@ const std::string& ExpiredPageHtml() {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>Pons</title>
 <style>body{font:16px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;max-width:480px;margin:15vh auto;padding:16px;text-align:center}</style>
-</head><body><h1>Link expired</h1><p>Scan the QR code shown in Pons on your PC again.</p></body></html>
+</head><body><h1>Link expired</h1><p>Scan the QR code or open the new link from Pons on your PC.</p></body></html>
 )PONS";
     return page;
 }

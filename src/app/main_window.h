@@ -15,7 +15,7 @@ namespace pons {
 
 inline constexpr wchar_t kMainWindowClass[] = L"PonsWiFiTransferWindow";
 
-// Pons' only window: the QR code to scan, the files offered to the phone,
+// Pons' only window: the QR code to scan, the files offered to other devices,
 // the transfers and the shared text. Closing it stops the server.
 class MainWindow {
 public:
