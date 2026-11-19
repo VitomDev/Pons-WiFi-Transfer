@@ -24,6 +24,7 @@ Open Pons, scan the QR code with a phone camera (or open the link on another com
   - Every request needs a random per-session key, included in the QR code. **New link** changes it at once
   - Only devices on your private network (home Wi-Fi) can connect
   - The server stops after **15 minutes** without use (5, 15, 30, 60 minutes or never) and when you close Pons
+- 🕒 **Keep sharing after closing**: when you close the window, Pons asks whether to quit or keep running in the notification area for 15 minutes up to 4 hours, so someone can still download what you shared. Tick **Remember my choice** to skip the question
   - Half-received files never look complete, and names sent by other devices can't escape the chosen folder
 - 🌐 Changed Wi-Fi? Pons notices and shows a new code
 - 🌙 Clean Windows 11 look that follows your light or dark theme; the browser page follows the device's theme too
@@ -56,7 +57,8 @@ Uninstalling (Settings → Apps) removes Pons and its settings. Files you receiv
 | Send text or a link | Type it and **Send to devices** / **Send to PC** |
 | Invalidate the old QR code | **New link** |
 | Copy the link (e.g. for a laptop) | **Copy link** |
-| Port and idle timeout | Bottom left of the window |
+| Port, idle timeout and what closing does | Bottom left of the window (**When closed**) |
+| Open Pons again while it runs in the background | Click its icon in the notification area |
 
 💡 The PC and the other device must be on the same network. Guest Wi-Fi networks often isolate devices from each other; use the main network if a device can't connect.
 

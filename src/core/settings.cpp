@@ -27,6 +27,12 @@ Settings Settings::Load(const wchar_t* keyPath) {
     DWORD value = 0;
     if (ReadDword(key, L"Port", value) && IsValidPort(static_cast<int>(value))) settings.port = static_cast<int>(value);
     if (ReadDword(key, L"TimeoutMinutes", value) && value <= 24 * 60) settings.timeoutMinutes = static_cast<int>(value);
+    if (ReadDword(key, L"CloseAction", value) && value <= static_cast<DWORD>(CloseAction::KeepRunning)) {
+        settings.closeAction = static_cast<CloseAction>(value);
+    }
+    if (ReadDword(key, L"BackgroundMinutes", value) && value >= 1 && value <= kMaxBackgroundMinutes) {
+        settings.backgroundMinutes = static_cast<int>(value);
+    }
 
     wchar_t folder[MAX_PATH * 2]{};
     DWORD size = sizeof(folder);
@@ -45,6 +51,8 @@ bool Settings::Save(const wchar_t* keyPath) const {
     const std::wstring folder = receiveFolder.wstring();
     const bool saved = WriteDword(key, L"Port", static_cast<DWORD>(port)) &&
                        WriteDword(key, L"TimeoutMinutes", static_cast<DWORD>(timeoutMinutes)) &&
+                       WriteDword(key, L"CloseAction", static_cast<DWORD>(closeAction)) &&
+                       WriteDword(key, L"BackgroundMinutes", static_cast<DWORD>(backgroundMinutes)) &&
                        RegSetValueExW(key, L"ReceiveFolder", 0, REG_SZ, reinterpret_cast<const BYTE*>(folder.c_str()),
                                       static_cast<DWORD>((folder.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
     RegCloseKey(key);

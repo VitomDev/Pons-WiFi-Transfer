@@ -248,15 +248,23 @@ TEST(SavesSettings) {
     RegDeleteTreeW(HKEY_CURRENT_USER, kTestSettingsKey);
     const Settings defaults = Settings::Load(kTestSettingsKey);
     CHECK(defaults.port == kDefaultPort && defaults.timeoutMinutes == 15 && defaults.receiveFolder.empty());
+    CHECK(defaults.closeAction == CloseAction::Ask && defaults.backgroundMinutes == kDefaultBackgroundMinutes);
     Settings settings;
     settings.port = 9000;
     settings.timeoutMinutes = 0;
     settings.receiveFolder = L"D:\\Fotos móvil";
+    settings.closeAction = CloseAction::KeepRunning;
+    settings.backgroundMinutes = 240;
     CHECK(settings.Save(kTestSettingsKey));
     const Settings loaded = Settings::Load(kTestSettingsKey);
     CHECK(loaded.port == 9000 && loaded.timeoutMinutes == 0 && loaded.receiveFolder == settings.receiveFolder);
+    CHECK(loaded.closeAction == CloseAction::KeepRunning && loaded.backgroundMinutes == 240);
     RegSetKeyValueW(HKEY_CURRENT_USER, kTestSettingsKey, L"Port", REG_DWORD, "\x10\0\0\0", 4);
     CHECK(Settings::Load(kTestSettingsKey).port == kDefaultPort);
+    RegSetKeyValueW(HKEY_CURRENT_USER, kTestSettingsKey, L"CloseAction", REG_DWORD, "\x07\0\0\0", 4);
+    RegSetKeyValueW(HKEY_CURRENT_USER, kTestSettingsKey, L"BackgroundMinutes", REG_DWORD, "\0\0\0\0", 4);
+    const Settings invalid = Settings::Load(kTestSettingsKey);
+    CHECK(invalid.closeAction == CloseAction::Ask && invalid.backgroundMinutes == kDefaultBackgroundMinutes);
     RegDeleteTreeW(HKEY_CURRENT_USER, kTestSettingsKey);
     CHECK(!IsValidPort(80) && IsValidPort(8642) && !IsValidPort(70000));
 }

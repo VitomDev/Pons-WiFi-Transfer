@@ -6,6 +6,7 @@
 #include "core/settings.h"
 
 #include <windows.h>
+#include <shellapi.h>
 
 #include <filesystem>
 #include <string>
@@ -16,7 +17,9 @@ namespace pons {
 inline constexpr wchar_t kMainWindowClass[] = L"PonsWiFiTransferWindow";
 
 // Pons' only window: the QR code to scan, the files offered to other devices,
-// the transfers and the shared text. Closing it stops the server.
+// the transfers and the shared text. Closing it either stops the server or
+// keeps sharing for a while from the notification area, as the user chooses.
+// A plain WM_CLOSE (the installer) always quits.
 class MainWindow {
 public:
     MainWindow();
@@ -58,6 +61,15 @@ private:
     void ShareText();
     void ApplyPort();
 
+    void OnCloseRequested();
+    bool AskHowToClose(CloseAction& action, int& minutes);
+    void EnterBackground(int minutes);
+    void LeaveBackground();
+    void AddTrayIcon();
+    void RemoveTrayIcon();
+    void ShowTrayMenu(POINT point);
+    void SelectCloseChoice();
+
     int Scale(int value) const { return MulDiv(value, static_cast<int>(dpi_), 96); }
 
     HINSTANCE instance_ = nullptr;
@@ -67,7 +79,17 @@ private:
     HWND text_ = nullptr;
     HWND port_ = nullptr;
     HWND timeout_ = nullptr;
+    HWND closeChoice_ = nullptr;
     std::vector<HWND> buttons_;
+
+    // Background mode: the window is hidden and a tray icon brings it back.
+    bool inBackground_ = false;
+    ULONGLONG backgroundUntil_ = 0;
+    bool trayIconAdded_ = false;
+    NOTIFYICONDATAW trayIcon_{};
+    UINT taskbarCreatedMessage_ = 0;
+    // The idle timeout counts from here at the earliest (e.g. back from the tray).
+    ULONGLONG idleSince_ = 0;
 
     Server server_;
     Settings settings_;
@@ -99,6 +121,7 @@ private:
     RECT textHeading_{};
     RECT portLabel_{};
     RECT timeoutLabel_{};
+    RECT closeLabel_{};
 };
 
 }  // namespace pons

@@ -5,7 +5,7 @@
 ;
 ; Built by build.ps1, which passes /DBuildDir=<folder with Pons.exe>.
 
-#define AppVersion "1.0.1"
+#define AppVersion "1.1.0"
 #define AppName "Pons WiFi Transfer"
 
 #ifndef BuildDir

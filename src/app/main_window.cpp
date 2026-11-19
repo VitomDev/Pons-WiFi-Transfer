@@ -1,6 +1,7 @@
 #include "app/main_window.h"
 
 #include "app/resource.h"
+#include "app/vitool_tray.h"
 #include "core/http.h"
 #include "core/network.h"
 #include "core/paths.h"
@@ -14,6 +15,8 @@
 #include <windowsx.h>
 
 #include <algorithm>
+#include <cwchar>
+#include <iterator>
 
 namespace pons {
 
@@ -26,6 +29,12 @@ constexpr ULONGLONG kNetworkCheckMs = 10'000;
 // The page asks every two seconds; a little longer than that means gone.
 constexpr ULONGLONG kDeviceSeenMs = 6'000;
 constexpr int kTimeoutChoices[] = {5, 15, 30, 60, 0};
+constexpr UINT WM_APP_TRAY = WM_APP + 2;
+// How long Pons can keep sharing after its window is closed.
+constexpr int kBackgroundChoices[] = {15, 30, 60, 120, 240};
+// Item data in the "When closed" box: Ask, Quit, or keep running for N minutes.
+constexpr LRESULT kCloseAsk = -1;
+constexpr LRESULT kCloseQuit = 0;
 
 enum ControlId {
     kCopyLink = 101,
@@ -42,7 +51,38 @@ enum ControlId {
     kTextBox,
     kPortBox,
     kTimeoutBox,
+    kCloseBox,
+    kBackgroundRadio = 300,
+    kKeepRunningButton = 400,
+    kQuitButton,
+    kMenuOpen = 500,
+    kMenuCopyLink,
+    kMenuQuit,
 };
+
+std::wstring FormatDuration(int minutes) {
+    if (minutes % 60 != 0) return std::to_wstring(minutes) + (minutes == 1 ? L" minute" : L" minutes");
+    const int hours = minutes / 60;
+    return std::to_wstring(hours) + (hours == 1 ? L" hour" : L" hours");
+}
+
+// The local clock time `minutes` from now, e.g. "15:30".
+std::wstring ClockTimeAfter(int minutes) {
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER ticks;
+    ticks.LowPart = now.dwLowDateTime;
+    ticks.HighPart = now.dwHighDateTime;
+    ticks.QuadPart += static_cast<ULONGLONG>(minutes) * 60 * 10'000'000;
+    const FILETIME later{ticks.LowPart, ticks.HighPart};
+    SYSTEMTIME utc;
+    SYSTEMTIME local;
+    wchar_t text[64]{};
+    if (FileTimeToSystemTime(&later, &utc) && SystemTimeToTzSpecificLocalTime(nullptr, &utc, &local)) {
+        GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &local, nullptr, text, 64);
+    }
+    return text;
+}
 
 struct ButtonInfo {
     int id;
@@ -165,6 +205,8 @@ bool MainWindow::Create(HINSTANCE instance, int show, const std::vector<std::fil
     if (!window_) return false;
 
     server_.SetNotifyWindow(window_, WM_APP_SERVER);
+    taskbarCreatedMessage_ = RegisterWindowMessageW(L"TaskbarCreated");
+    idleSince_ = GetTickCount64();
     CreateControls();
     RefreshStyle();
     Layout();
@@ -197,6 +239,12 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND window, UINT message, WPARAM wParam
 }
 
 LRESULT MainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
+    if (vitool_tray::HandleMessage(message, wParam)) return 0;
+    if (message == taskbarCreatedMessage_ && taskbarCreatedMessage_ != 0) {
+        // Explorer restarted: the tray icon has to be added again.
+        if (trayIconAdded_) AddTrayIcon();
+        return 0;
+    }
     switch (message) {
         case WM_PAINT: {
             PAINTSTRUCT paint;
@@ -303,10 +351,23 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
                 start = end + 1;
             }
             AddFiles(paths);
+            if (inBackground_) LeaveBackground();
             if (IsIconic(window_)) ShowWindow(window_, SW_RESTORE);
             SetForegroundWindow(window_);
             return TRUE;
         }
+        case WM_APP_TRAY:
+            switch (LOWORD(lParam)) {
+                case NIN_SELECT:
+                case NIN_KEYSELECT:
+                case NIN_BALLOONUSERCLICK:
+                    LeaveBackground();
+                    break;
+                case WM_CONTEXTMENU:
+                    ShowTrayMenu({GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam)});
+                    break;
+            }
+            return 0;
         case WM_APP_SERVER:
             if (static_cast<ServerEvent>(wParam) == ServerEvent::TextFromDevice) {
                 SetWindowTextW(text_, ToWindowsLineBreaks(server_.Text()).c_str());
@@ -319,20 +380,29 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
             return 0;
         case WM_TIMER:
             if (wParam == kTickTimer) {
+                // Time is up, but a download still running gets to finish.
+                if (inBackground_ && GetTickCount64() >= backgroundUntil_ && !server_.HasActiveTransfers()) {
+                    DestroyWindow(window_);
+                    return 0;
+                }
                 CheckIdleAndNetwork();
                 UpdateStatus();
             }
             return 0;
-        case WM_CLOSE:
-            if (server_.HasActiveTransfers() &&
-                MessageBoxW(window_, L"A transfer is still in progress. Close Pons and stop it?", L"Pons",
-                            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
+        case WM_SYSCOMMAND:
+            // The user closing the window (title bar, Alt+F4, taskbar).
+            if ((wParam & 0xFFF0) == SC_CLOSE) {
+                OnCloseRequested();
                 return 0;
             }
+            break;
+        case WM_CLOSE:
+            // Sent by the installer before upgrading or uninstalling: quit without asking.
             DestroyWindow(window_);
             return 0;
         case WM_DESTROY:
             KillTimer(window_, kTickTimer);
+            RemoveTrayIcon();
             server_.Stop();
             PostQuitMessage(0);
             return 0;
@@ -382,6 +452,35 @@ void MainWindow::CreateControls() {
         if (minutes == settings_.timeoutMinutes) SendMessageW(timeout_, CB_SETCURSEL, index, 0);
     }
     if (SendMessageW(timeout_, CB_GETCURSEL, 0, 0) == CB_ERR) SendMessageW(timeout_, CB_SETCURSEL, 1, 0);
+
+    closeChoice_ = CreateWindowExW(0, WC_COMBOBOXW, nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+                                   0, 0, 0, 0, window_, reinterpret_cast<HMENU>(kCloseBox), instance_, nullptr);
+    const auto addChoice = [&](const std::wstring& label, LRESULT data) {
+        const auto index = SendMessageW(closeChoice_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+        SendMessageW(closeChoice_, CB_SETITEMDATA, index, data);
+    };
+    addChoice(L"Ask first", kCloseAsk);
+    addChoice(L"Quit", kCloseQuit);
+    for (const int minutes : kBackgroundChoices) addChoice(L"Keep " + FormatDuration(minutes), minutes);
+    SelectCloseChoice();
+}
+
+void MainWindow::SelectCloseChoice() {
+    const LRESULT wanted = settings_.closeAction == CloseAction::Ask    ? kCloseAsk
+                           : settings_.closeAction == CloseAction::Quit ? kCloseQuit
+                                                                        : settings_.backgroundMinutes;
+    const auto count = SendMessageW(closeChoice_, CB_GETCOUNT, 0, 0);
+    for (LRESULT index = 0; index < count; ++index) {
+        if (SendMessageW(closeChoice_, CB_GETITEMDATA, index, 0) == wanted) {
+            SendMessageW(closeChoice_, CB_SETCURSEL, index, 0);
+            return;
+        }
+    }
+    // A duration set outside the list (e.g. by hand in the registry).
+    const std::wstring label = L"Keep " + FormatDuration(static_cast<int>(wanted));
+    const auto index = SendMessageW(closeChoice_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+    SendMessageW(closeChoice_, CB_SETITEMDATA, index, wanted);
+    SendMessageW(closeChoice_, CB_SETCURSEL, index, 0);
 }
 
 void MainWindow::RefreshStyle() {
@@ -399,8 +498,11 @@ void MainWindow::RefreshStyle() {
     iconFont_ = CreateIconFont(dpi_, 10);
 
     ApplyWindowStyle(window_, theme_);
-    for (HWND control : {files_, text_, port_, timeout_}) SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(textFont_), TRUE);
+    for (HWND control : {files_, text_, port_, timeout_, closeChoice_}) {
+        SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(textFont_), TRUE);
+    }
     SetWindowTheme(timeout_, theme_.dark ? L"DarkMode_CFD" : L"CFD", nullptr);
+    SetWindowTheme(closeChoice_, theme_.dark ? L"DarkMode_CFD" : L"CFD", nullptr);
     SetWindowTheme(port_, theme_.dark ? L"DarkMode_CFD" : L"CFD", nullptr);
     const COLORREF field = theme_.dark ? RGB(32, 32, 32) : RGB(255, 255, 255);
     ListView_SetBkColor(files_, field);
@@ -439,6 +541,8 @@ void MainWindow::Layout() {
     place(kPortBox, left + leftWidth - Scale(120), optionsTop, Scale(120), fieldHeight);
     timeoutLabel_ = {left, optionsTop + fieldHeight + gap, left + Scale(130), optionsTop + 2 * fieldHeight + gap};
     place(kTimeoutBox, left + leftWidth - Scale(120), timeoutLabel_.top, Scale(120), Scale(200));
+    closeLabel_ = {left, timeoutLabel_.bottom + gap, left + Scale(130), timeoutLabel_.bottom + gap + fieldHeight};
+    place(kCloseBox, left + leftWidth - Scale(120), closeLabel_.top, Scale(120), Scale(240));
 
     // Right: shared files, transfers and text.
     const int right = client.right - margin;
@@ -541,6 +645,7 @@ void MainWindow::Paint(HDC dc) {
 
     DrawTextIn(dc, textFont_, theme_.text, L"Port", portLabel_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     DrawTextIn(dc, textFont_, theme_.text, L"Stop when idle for", timeoutLabel_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextIn(dc, textFont_, theme_.text, L"When closed", closeLabel_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
     DrawTextIn(dc, headingFont_, theme_.text, L"Shared with your devices", filesHeading_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     RECT folderCaption = folderLabel_;
@@ -609,6 +714,21 @@ void MainWindow::OnCommand(int id, int code) {
                 settings_.Save();
             }
             break;
+        case kCloseBox:
+            if (code == CBN_SELCHANGE) {
+                const auto index = SendMessageW(closeChoice_, CB_GETCURSEL, 0, 0);
+                const LRESULT data = SendMessageW(closeChoice_, CB_GETITEMDATA, index, 0);
+                if (data == kCloseAsk) {
+                    settings_.closeAction = CloseAction::Ask;
+                } else if (data == kCloseQuit) {
+                    settings_.closeAction = CloseAction::Quit;
+                } else {
+                    settings_.closeAction = CloseAction::KeepRunning;
+                    settings_.backgroundMinutes = static_cast<int>(data);
+                }
+                settings_.Save();
+            }
+            break;
     }
 }
 
@@ -646,8 +766,9 @@ void MainWindow::UpdateQr() {
 
 void MainWindow::CheckIdleAndNetwork() {
     const ULONGLONG now = GetTickCount64();
-    if (state_ == ServerState::Running && settings_.timeoutMinutes > 0 && !server_.HasActiveTransfers() &&
-        now - server_.LastActivity() > static_cast<ULONGLONG>(settings_.timeoutMinutes) * 60'000) {
+    // In the background the chosen time replaces the idle timeout.
+    if (state_ == ServerState::Running && !inBackground_ && settings_.timeoutMinutes > 0 && !server_.HasActiveTransfers() &&
+        now - std::max(server_.LastActivity(), idleSince_) > static_cast<ULONGLONG>(settings_.timeoutMinutes) * 60'000) {
         server_.Stop();
         state_ = ServerState::Idle;
         UpdateQr();
@@ -705,6 +826,169 @@ void MainWindow::ApplyPort() {
     settings_.port = port;
     settings_.Save();
     StartServer();
+}
+
+// --- Closing and the background -----------------------------------------------
+
+void MainWindow::OnCloseRequested() {
+    // Nothing to share while the server is stopped: just quit.
+    if (state_ != ServerState::Running) {
+        DestroyWindow(window_);
+        return;
+    }
+    CloseAction action = settings_.closeAction;
+    int minutes = settings_.backgroundMinutes;
+    const bool asked = action == CloseAction::Ask;
+    if (asked && !AskHowToClose(action, minutes)) return;
+    if (action == CloseAction::KeepRunning) {
+        EnterBackground(minutes);
+        return;
+    }
+    // The question already warned about a running transfer.
+    if (!asked && server_.HasActiveTransfers() &&
+        MessageBoxW(window_, L"A transfer is still in progress. Close Pons and stop it?", L"Pons",
+                    MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
+        return;
+    }
+    DestroyWindow(window_);
+}
+
+bool MainWindow::AskHowToClose(CloseAction& action, int& minutes) {
+    std::wstring content =
+        L"Your devices can still open the link to download what you shared or send you files. "
+        L"Pons waits in the notification area and quits when the time is up.";
+    if (server_.HasActiveTransfers()) content += L"\n\nA transfer is in progress. Closing Pons now stops it.";
+
+    // Our own Cancel: the common one follows the Windows language, and Pons is English only.
+    const TASKDIALOG_BUTTON buttons[] = {
+        {kKeepRunningButton, L"Keep running"}, {kQuitButton, L"Close Pons"}, {IDCANCEL, L"Cancel"}};
+    std::wstring labels[std::size(kBackgroundChoices)];
+    TASKDIALOG_BUTTON radios[std::size(kBackgroundChoices)];
+    int defaultRadio = kBackgroundRadio + 2;  // 1 hour
+    for (size_t i = 0; i < std::size(kBackgroundChoices); ++i) {
+        labels[i] = L"For " + FormatDuration(kBackgroundChoices[i]);
+        radios[i] = {kBackgroundRadio + static_cast<int>(i), labels[i].c_str()};
+        if (kBackgroundChoices[i] == minutes) defaultRadio = radios[i].nButtonID;
+    }
+
+    TASKDIALOGCONFIG config{sizeof(config)};
+    config.hwndParent = window_;
+    config.hInstance = instance_;
+    config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+    config.pszWindowTitle = L"Pons";
+    config.pszMainInstruction = L"Keep sharing after you close Pons?";
+    config.pszContent = content.c_str();
+    config.cButtons = static_cast<UINT>(std::size(buttons));
+    config.pButtons = buttons;
+    config.nDefaultButton = kKeepRunningButton;
+    config.cRadioButtons = static_cast<UINT>(std::size(radios));
+    config.pRadioButtons = radios;
+    config.nDefaultRadioButton = defaultRadio;
+    config.pszVerificationText = L"Remember my choice";
+    config.pszFooter = L"You can change this later under “When closed”.";
+
+    int button = 0;
+    int radio = 0;
+    BOOL remember = FALSE;
+    if (FAILED(TaskDialogIndirect(&config, &button, &radio, &remember))) {
+        action = CloseAction::Quit;
+        return true;
+    }
+    if (button != kKeepRunningButton && button != kQuitButton) return false;  // Cancelled.
+
+    action = button == kKeepRunningButton ? CloseAction::KeepRunning : CloseAction::Quit;
+    const int choice = radio - kBackgroundRadio;
+    if (choice >= 0 && choice < static_cast<int>(std::size(kBackgroundChoices))) {
+        minutes = kBackgroundChoices[choice];
+    }
+    // The duration is offered first next time, remembered or not.
+    if (action == CloseAction::KeepRunning) settings_.backgroundMinutes = minutes;
+    if (remember) settings_.closeAction = action;
+    settings_.Save();
+    SelectCloseChoice();
+    return true;
+}
+
+void MainWindow::EnterBackground(int minutes) {
+    inBackground_ = true;
+    backgroundUntil_ = GetTickCount64() + static_cast<ULONGLONG>(minutes) * 60'000;
+    const std::wstring until = ClockTimeAfter(minutes);
+    ShowWindow(window_, SW_HIDE);
+    AddTrayIcon();
+    swprintf_s(trayIcon_.szTip, L"Pons — sharing until %s", until.c_str());
+    trayIcon_.uFlags = NIF_TIP | NIF_SHOWTIP;
+    vitool_tray::NotifyIcon(NIM_MODIFY, &trayIcon_);
+
+    NOTIFYICONDATAW balloon = trayIcon_;
+    balloon.uFlags = NIF_INFO;
+    balloon.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME;
+    wcscpy_s(balloon.szInfoTitle, L"Pons is still sharing");
+    swprintf_s(balloon.szInfo, L"Until %s. Click the Pons icon to open it again.", until.c_str());
+    vitool_tray::NotifyIcon(NIM_MODIFY, &balloon);
+}
+
+void MainWindow::LeaveBackground() {
+    if (!inBackground_) return;
+    inBackground_ = false;
+    RemoveTrayIcon();
+    // The idle timeout starts over now that the window is back.
+    idleSince_ = GetTickCount64();
+    ShowWindow(window_, SW_SHOW);
+    if (IsIconic(window_)) ShowWindow(window_, SW_RESTORE);
+    SetForegroundWindow(window_);
+}
+
+void MainWindow::AddTrayIcon() {
+    const std::wstring tip = trayIcon_.szTip;
+    if (trayIcon_.hIcon) DestroyIcon(trayIcon_.hIcon);
+    trayIcon_ = {sizeof(trayIcon_)};
+    trayIcon_.hWnd = window_;
+    trayIcon_.uID = 1;
+    trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+    trayIcon_.uCallbackMessage = WM_APP_TRAY;
+    LoadIconMetric(instance_, MAKEINTRESOURCEW(IDI_PONS), LIM_SMALL, &trayIcon_.hIcon);
+    wcscpy_s(trayIcon_.szTip, tip.empty() ? L"Pons — WiFi Transfer" : tip.c_str());
+    vitool_tray::NotifyIcon(NIM_ADD, &trayIcon_);
+    trayIcon_.uVersion = NOTIFYICON_VERSION_4;
+    vitool_tray::NotifyIcon(NIM_SETVERSION, &trayIcon_);
+    trayIconAdded_ = true;
+}
+
+void MainWindow::RemoveTrayIcon() {
+    if (!trayIconAdded_) return;
+    vitool_tray::NotifyIcon(NIM_DELETE, &trayIcon_);
+    trayIconAdded_ = false;
+    if (trayIcon_.hIcon) DestroyIcon(trayIcon_.hIcon);
+    trayIcon_ = {};
+}
+
+void MainWindow::ShowTrayMenu(POINT point) {
+    HMENU menu = CreatePopupMenu();
+    AppendMenuW(menu, MF_STRING, kMenuOpen, L"Open Pons");
+    AppendMenuW(menu, MF_STRING | (state_ == ServerState::Running ? 0 : MF_GRAYED), kMenuCopyLink, L"Copy link");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, kMenuQuit, L"Quit Pons");
+    SetMenuDefaultItem(menu, kMenuOpen, FALSE);
+    // Required so the menu closes when clicking elsewhere.
+    SetForegroundWindow(window_);
+    const UINT command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, point.x, point.y, window_, nullptr);
+    DestroyMenu(menu);
+    switch (command) {
+        case kMenuOpen:
+            LeaveBackground();
+            break;
+        case kMenuCopyLink:
+            if (state_ == ServerState::Running) CopyToClipboard(window_, server_.Url());
+            break;
+        case kMenuQuit:
+            if (server_.HasActiveTransfers() &&
+                MessageBoxW(nullptr, L"A transfer is still in progress. Quit Pons and stop it?", L"Pons",
+                            MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2 | MB_SETFOREGROUND) != IDYES) {
+                break;
+            }
+            DestroyWindow(window_);
+            break;
+    }
 }
 
 // --- Files --------------------------------------------------------------------
